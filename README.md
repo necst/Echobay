@@ -27,3 +27,8 @@ After configuration and building (see docs for details) the basic usage is:
 - [Giuseppe Franco](https://github.com/Giuseppe5)
 
 Other important contributions in this research are from Claudio Gallicchio and Alessio Micheli (Department of Computer Science, University of Pisa) and Marco D. Santambrogio (Dipartimento di Informatica, Elettronica e Bioingegneria, Politecnico di Milano)
+
+### Citing EchoBay
+If you use EchoBay in a scientific paper, please cite:
+
+Cerina, Luca, Giuseppe Franco, and Marco D. Santambrogio. (2019) [Lightweight autonomous bayesian optimization of Echo-State Networks.](https://www.elen.ucl.ac.be/Proceedings/esann/esannpdf/es2019-103.pdf), European Symposium on Artificial Neural Networks, ESANN, 2019.
