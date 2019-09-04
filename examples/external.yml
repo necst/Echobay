@@ -1,0 +1,33 @@
+---
+num_datasets : 1
+num_datasets_train: 1
+num_datasets_test: 1
+
+train_data : "./laser/TrainData.csv"
+train_label : "./laser/TrainLabel.csv"
+eval_data : "./laser/ValData.csv"
+eval_label: "./laser/ValLabel.csv"
+test_data : "./laser/TestData.csv"
+test_label : "./laser/TestLabel.csv"
+
+# Call external fitness function using user-defined python functions
+Problem_Definition : {type: "External", Fitness_Function: "mae"}
+early_stop : 100
+Guesses: 5
+blockStep: 1000
+
+input_dimension_layer : 5
+Nr : {type : "dynamic", index : 0, upper_bound : 150, lower_bound : 30}
+leaky : {type: "dynamic", index: 1, upper_bound: 1, lower_bound: 0.1}
+rho : {type: "dynamic", , index: 2, upper_bound: 1, lower_bound: 0.1}
+scaleIn : {type: "dynamic", index: 3, count: 2, upper_bound: 1, lower_bound: 0.05}
+density :  {type: "dynamic", index: 4, upper_bound: 0.05, lower_bound: 0.02}
+
+input_dimension_general : 0
+lambda : {type : "fixed", value : 0}
+Nl : {type: "fixed", value: 1}
+washout_sample : {type : "fixed", value: 100}
+
+sample_threads : 1
+eigen_threads : 4
+...
