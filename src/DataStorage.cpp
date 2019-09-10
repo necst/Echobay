@@ -143,6 +143,10 @@ ArrayBO EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData,
                 samplingPoints[washout] = 0;
             }
         }
+        else if(samplingData(s,1) == 1)
+        {
+            samplingPoints[resetSamples[s] - 1] = 1;
+        }
     }
 
     if(type == "train")
