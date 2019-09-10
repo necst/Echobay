@@ -201,6 +201,9 @@ int main(int argc, char **argv)
         MainFolder = NameFolder + "/";
     }
 
+    // Set problem type
+    std::string problemType = configData["Problem_Definition"]["type"].as<std::string>();
+
     // Control execution
     for (int dataIter = 1; dataIter <= nDatasets; dataIter++)
     {
@@ -224,6 +227,13 @@ int main(int argc, char **argv)
         series.load_data(evalDataFile, evalLabelFile, "valid");
         evalData = series.get_data("valid", "data");
         evalLabel = series.get_data("valid", "label");
+
+        // Check classes in validation for classification tasks
+        if((max(evalLabel) > max(trainLabel)) & problemType == "Classification")
+        {
+            std::cout << "Error! Validation labels contain more classes than Training labels" << std::endl;
+            return -1;
+        }
 
         // Load Sampling vectors
         if (configData["train_sampling"])
@@ -333,7 +343,6 @@ int main(int argc, char **argv)
         }
         
         // Set test sampling
-        std::string problemType = configData["Problem_Definition"]["type"].as<std::string>();
         int nWashout = parse_config<int>("washout_sample", -1, 0, bestSample, configData, 10);
         series.set_sampleArray(fullTrainSampling, nWashout, true, problemType, "train");
         bool init_flag = fullTrainSampling(fullTrainSampling.rows() - 1, 1) == 0;
