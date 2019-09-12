@@ -229,7 +229,7 @@ int main(int argc, char **argv)
         evalLabel = series.get_data("valid", "label");
 
         // Check classes in validation for classification tasks
-        if((max(evalLabel) > max(trainLabel)) & problemType == "Classification")
+        if((evalLabel.maxCoeff() > trainLabel.maxCoeff()) & problemType == "Classification")
         {
             std::cout << "Error! Validation labels contain more classes than Training labels" << std::endl;
             return -1;
