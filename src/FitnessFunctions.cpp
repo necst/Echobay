@@ -191,7 +191,6 @@ MatrixBO EchoBay::Comparator::get_targetMatrix(const Eigen::Ref<const MatrixBO> 
 
         // Resize targetMatrix
         _targetMatrix.resize(label.rows(), _nClasses);
-        _targetMatrix.setZero();
 
         // Assign labels
         one_hot_encoding(_targetMatrix, label);
@@ -304,6 +303,9 @@ void EchoBay::Comparator::one_hot_encoding(Eigen::Ref<MatrixBO> Dst, MatrixBO Sr
     int k;
     int len = Src.rows();
 
+    // Reset matrix
+    Dst.setZero();
+    // Assign encoding
     for (int i = 0; i < len; ++i)
     {
         k = (int)Src(i);
@@ -483,15 +485,13 @@ floatBO EchoBay::Comparator::Accuracy(Eigen::Ref<MatrixBO> predict, Eigen::Ref<M
 {
     // This part can be put in a function as well
     MatrixBO label(actual.rows(), actual.cols());
-    //std::cout << predict.size() << "\n";
+
     int argMax;
     for (size_t i = 0; i < (size_t)actual.size(); ++i)
     {
         //Compute Argmax to determine the class
         predict.row(i).maxCoeff(&argMax);
-
         label(i, 0) = ((floatBO)argMax);
-        //OutputLabel.push_back((floatBO)argMax);
     }
 
     // Compute Confusion Matrix
@@ -500,13 +500,7 @@ floatBO EchoBay::Comparator::Accuracy(Eigen::Ref<MatrixBO> predict, Eigen::Ref<M
     ConfusionMatrix(label, actual, nOutput, ConfusionMat);
     std::cout << "\n" << ConfusionMat << std::endl;
 
-    floatBO Accuracy = 0;
-
-    for (int i = 0; i < nOutput; ++i)
-    {
-        Accuracy += ConfusionMat(i, i);
-    }
-    Accuracy = Accuracy / ConfusionMat.sum();
+    floatBO Accuracy = ConfusionMat.diagonal().sum() / (double)ConfusionMat.sum();
     return 100 * Accuracy;
 }
 
