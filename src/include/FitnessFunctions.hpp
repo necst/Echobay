@@ -31,24 +31,6 @@ namespace EchoBay
      */
     class Comparator
     {
-        protected:
-        static floatBO find_median(std::vector<floatBO> len);
-        static floatBO find_median(Eigen::Ref<ArrayBO> len);
-        //floatBO calc_error(std::vector<floatBO> predict, std::vector<floatBO> actual);
-        
-        void multi_out_encoding(Eigen::Ref<MatrixBO> input_data, Eigen::Ref<MatrixBO> target_data);
-        static void ConfusionMatrix(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<Eigen::MatrixXi> ConfusionMat);
-
-        static floatBO MSA(           Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-        static floatBO NRMSE(         Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-        static floatBO F1Mean(        Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-        static floatBO Accuracy(      Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-        static floatBO MemoryCapacity(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-#if defined(USE_PYBIND)
-        static floatBO ExtFitness(    Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
-#endif
-        int get_nClasses(const Eigen::Ref<const MatrixBO> label);
-
         public:
         Comparator(const std::string &problemType, const std::string &fitnessRule);
         ~Comparator() {};
@@ -60,7 +42,25 @@ namespace EchoBay
 
         void one_hot_encoding(Eigen::Ref<MatrixBO> Dst, MatrixBO Src);
         int get_nClasses();
-        
+
+        protected:
+        static floatBO find_median(std::vector<floatBO> len);
+        static floatBO find_median(Eigen::Ref<ArrayBO> len);
+        //floatBO calc_error(std::vector<floatBO> predict, std::vector<floatBO> actual);
+
+        static MatrixBO argmax_label(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual);
+        void multi_out_encoding(Eigen::Ref<MatrixBO> input_data, Eigen::Ref<MatrixBO> target_data);
+        static void ConfusionMatrix(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<Eigen::MatrixXi> ConfusionMat);
+
+        static floatBO MSA(           Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+        static floatBO NRMSE(         Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+        static floatBO F1Mean(        Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+        static floatBO Accuracy(      Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+        static floatBO MemoryCapacity(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+#if defined(USE_PYBIND)
+        static floatBO ExtFitness(    Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule);
+#endif
+        int get_nClasses(const Eigen::Ref<const MatrixBO> label);   
 
         private:
         std::string _problemType = "Regression";

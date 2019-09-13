@@ -336,9 +336,9 @@ void EchoBay::Comparator::multi_out_encoding(Eigen::Ref<MatrixBO> input_data,
  * @param predict Eigen Matrix containing predicted labels
  * @param actual Eigen Matrix containing actual labels
  * @param nOutput number of classes
- * @param ConfusionMat Output confusion matrix TODO make this return value
+ * @param confusionMat Output confusion matrix TODO make this return value
  */
-void EchoBay::Comparator::ConfusionMatrix(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<Eigen::MatrixXi> ConfusionMat)
+void EchoBay::Comparator::ConfusionMatrix(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<Eigen::MatrixXi> confusionMat)
 {
     int i, c;
     for (size_t j = 0; j < (size_t)actual.size(); j++)
@@ -346,7 +346,7 @@ void EchoBay::Comparator::ConfusionMatrix(Eigen::Ref<MatrixBO> predict, Eigen::R
         c = (int)actual(j, 0);
         for (i = 0; i < nOutput; i++)
         {
-            ConfusionMat(c, i) += (int)predict(j, 0) == i;
+            confusionMat(c, i) += (int)predict(j, 0) == i;
         }
     }
 }
@@ -419,6 +419,30 @@ floatBO EchoBay::Comparator::NRMSE(Eigen::Ref<MatrixBO> predict, Eigen::Ref<Matr
 }
 
 /**
+ * @brief Calculate the output label of a prediction using argMax rule
+ * 
+ * 
+ * @param predict Eigen matrix of predicted values
+ * @param actual Eigen matrix of actual values
+ * @return MatrixBO labeled matrix
+ */
+MatrixBO EchoBay::Comparator::argmax_label(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual)
+{
+    // Declare label
+    MatrixBO label(actual.rows(), actual.cols());
+    int argMax;
+
+    for (size_t i = 0; i < (size_t)actual.size(); ++i)
+    {
+        //Compute Argmax to determine the class
+        predict.row(i).maxCoeff(&argMax);
+        label(i, 0) = ((floatBO)argMax);
+    }
+
+    return label;
+}
+
+/**
  * @brief Calculate fitness function as F1 classification accuracy
  * 
  * 
@@ -431,42 +455,31 @@ floatBO EchoBay::Comparator::NRMSE(Eigen::Ref<MatrixBO> predict, Eigen::Ref<Matr
  */
 floatBO EchoBay::Comparator::F1Mean(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule)
 {
-    // This part can be put in a function as well
-    MatrixBO label(actual.rows(), actual.cols());
-    int argMax;
-
-    for (size_t i = 0; i < (size_t)actual.size(); ++i)
-    {
-        //Compute Argmax to determine the class
-        predict.row(i).maxCoeff(&argMax);
-        label(i, 0) = ((floatBO)argMax);
-    }
+    // Determine labels
+    MatrixBO label = argmax_label(predict, actual);
     // Compute Confusion Matrix
-    Eigen::MatrixXi ConfusionMat(nOutput, nOutput);
-
-    ConfusionMat.setZero();
-    ConfusionMatrix(label, actual, nOutput, ConfusionMat);
-    std::cout << "\n" << ConfusionMat << std::endl;
+    Eigen::MatrixXi confusionMat = Eigen::MatrixXi::Zero(nOutput, nOutput);
+    ConfusionMatrix(label, actual, nOutput, confusionMat);
+    std::cout << "\n" << confusionMat << std::endl;
 
     floatBO F1 = 0;
-    floatBO RowWise = 0;
-    floatBO ColWise = 0;
-    floatBO actualClasses = 0;
-    floatBO F1temp = 0;
+    int actualClasses = 0;
+
+    ArrayI rowSum = confusionMat.rowwise().sum();
+    ArrayI colSum = confusionMat.colwise().sum();
+    ArrayI confusionDiag = confusionMat.diagonal();
 
     for (int i = 0; i < nOutput; i++)
     {
-        RowWise = (floatBO)(ConfusionMat.row(i).sum());
-        ColWise = (floatBO)(ConfusionMat.col(i).sum());
-        if (RowWise > 0)
+        if(rowSum(i) > 0)
         {
-            F1temp = 2 * ConfusionMat(i, i) / (RowWise + ColWise);
-            F1 += F1temp;
+            F1 += 2 * confusionDiag(i) / (floatBO)(rowSum(i) + colSum(i));
             actualClasses++;
         }
     }
 
-    F1 = F1 / actualClasses;
+    // Calculate mean
+    F1 = F1 / (floatBO) actualClasses;
     return 100 * F1;
 }
 
@@ -483,24 +496,14 @@ floatBO EchoBay::Comparator::F1Mean(Eigen::Ref<MatrixBO> predict, Eigen::Ref<Mat
  */
 floatBO EchoBay::Comparator::Accuracy(Eigen::Ref<MatrixBO> predict, Eigen::Ref<MatrixBO> actual, int nOutput, Eigen::Ref<MatrixBO> OutputLabel, const std::string rule)
 {
-    // This part can be put in a function as well
-    MatrixBO label(actual.rows(), actual.cols());
-
-    int argMax;
-    for (size_t i = 0; i < (size_t)actual.size(); ++i)
-    {
-        //Compute Argmax to determine the class
-        predict.row(i).maxCoeff(&argMax);
-        label(i, 0) = ((floatBO)argMax);
-    }
-
+    // Determine labels
+    MatrixBO label = argmax_label(predict, actual);
     // Compute Confusion Matrix
-    Eigen::MatrixXi ConfusionMat(nOutput, nOutput);
-    ConfusionMat.setZero();
-    ConfusionMatrix(label, actual, nOutput, ConfusionMat);
-    std::cout << "\n" << ConfusionMat << std::endl;
+    Eigen::MatrixXi confusionMat = Eigen::MatrixXi::Zero(nOutput, nOutput);
+    ConfusionMatrix(label, actual, nOutput, confusionMat);
+    std::cout << "\n" << confusionMat << std::endl;
 
-    floatBO Accuracy = ConfusionMat.diagonal().sum() / (double)ConfusionMat.sum();
+    floatBO Accuracy = confusionMat.diagonal().sum() / (double)confusionMat.sum();
     return 100 * Accuracy;
 }
 
