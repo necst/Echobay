@@ -207,7 +207,7 @@ struct ParSampler
         // Put to 1 the iterations in stop_max_iterations
 
         //Random Sampling
-        limbo::tools::par::loop(0, Params::init_gridsampling::bins(), [&](size_t i)
+        limbo::tools::par::loop(0, Params::init_randomsampling::bins(), [&](size_t i)
         {
             auto newSample = limbo::tools::random_vector(StateFunction::dim_in(), Params::bayes_opt_bobase::bounded());
             opt.eval_and_add(seval, newSample);
