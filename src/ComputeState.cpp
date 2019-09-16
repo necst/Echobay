@@ -9,25 +9,22 @@ using namespace Eigen;
  * @param Wr Reservoir's weights
  * @param src Input data
  * @param stateArr ESN state Array
- * @param u Single input
  * @param sampleState Eigen Array that manages state sampling
  */
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
                            Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
-                           Eigen::Ref<ArrayBO> stateArr, Eigen::Ref<ArrayBO> u,
+                           Eigen::Ref<ArrayBO> stateArr,
                            const Eigen::Ref<const ArrayBO> sampleState)
 {
     size_t trainSamples = src.rows();
-    size_t uSize = u.size() - 1;
+    MatrixBO u(src.cols()+1, src.rows());
+    u << src.transpose(), MatrixBO::Ones(1, src.rows()); // TODO improve this to avoid transpose
     int sample = 0;
     // Computation
     for (size_t t = 0; t < trainSamples; ++t)
     {
-        // Update input
-        u.head(uSize) = src.row(t);
-
         // Compute new state
-        stateArr = Win * u.matrix() + Wr * stateArr.matrix();
+        stateArr = Win * u.col(t) + Wr * stateArr.matrix();
         stateArr = stateArr.tanh();
 
         // Save state for later usage
@@ -51,17 +48,17 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
  * @param Wr Reservoir's weights
  * @param src Input data
  * @param stateArr ESN state Array
- * @param u Single input
  * @param sampleState Eigen Array that manages state sampling
  * @param leaky Leaky integration factor
  */
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
                            Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
-                           Eigen::Ref<ArrayBO> stateArr, Eigen::Ref<ArrayBO> u,
+                           Eigen::Ref<ArrayBO> stateArr,
                            const Eigen::Ref<const ArrayBO> sampleState, floatBO leaky)
 {
     size_t trainSamples = src.rows();
-    size_t uSize = u.size() - 1;
+    MatrixBO u(src.cols()+1, src.rows());
+    u << src.transpose(), MatrixBO::Ones(1, src.rows()); // TODO improve this to avoid transpose
     int sample = 0;
     // Leaky state
     ArrayBO prevState(stateArr.rows());
@@ -70,14 +67,11 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
     // Computation
     for (size_t t = 0; t < trainSamples; ++t)
     {
-        // Update input
-        u.head(uSize) = src.row(t);
-
         // Update leaky state
         prevState = leakyFactor * stateArr;
 
         // Compute new state
-        stateArr = Win * u.matrix() + Wr * stateArr.matrix();
+        stateArr = Win * u.col(t) + Wr * stateArr.matrix();
         stateArr = prevState + leaky * stateArr.tanh();
 
         // Save state for later usage
@@ -101,19 +95,19 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
  * @param WrL Vector containing reservoir weights matrices
  * @param src Input data
  * @param stateMat ESN state Matrix, one Array for each layer
- * @param u Single input
  * @param sampleState Eigen Array that manages state sampling
  * @param layerConfig Layers configuration vector
  */
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, const std::vector<MatrixBO> &WinL,
                            const std::vector<SparseBO> &WrL,
                            const MatrixBO &src, std::vector<ArrayBO> &stateMat,
-                           Eigen::Ref<ArrayBO> u, const Eigen::Ref<const ArrayBO> sampleState,
+                           const Eigen::Ref<const ArrayBO> sampleState,
                            const std::vector<layerParameter> &layerConfig)
 {
     // Variables
     size_t trainSamples = src.rows();
-    size_t uSize = u.size() - 1;
+    MatrixBO u(src.cols()+1, src.rows());
+    u << src.transpose(), MatrixBO::Ones(1, src.rows()); // TODO improve this to avoid transpose
     int nLayers = WinL.size();
     int sample = 0;
     int i;
@@ -147,14 +141,11 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, const std::vector<MatrixBO
     // Computation
     for (size_t t = 0; t < trainSamples; ++t)
     {
-        // update input
-        u.head(uSize) = src.row(t);
-
         // Update leaky state
         prevState[0] = leakyFactor[0] * stateMat[0];
 
         // Compute new state
-        stateMat[0] = WinL[0] * u.matrix() + WrL[0] * stateMat[0].matrix();
+        stateMat[0] = WinL[0] * u.col(t) + WrL[0] * stateMat[0].matrix();
         stateMat[0] = prevState[0] + leaky[0] * stateMat[0].tanh();
         for (i = 1; i < nLayers; ++i)
         {
@@ -179,9 +170,9 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, const std::vector<MatrixBO
             sample++;
             if (sampleState(t) == -1)
             {
-                for (int i = 0; i < nLayers; ++i)
+                for (auto& state : stateMat)
                 {
-                    stateMat[i].setZero();
+                    state.setZero();
                 }
             }
         }
@@ -234,7 +225,7 @@ ArrayBO EchoBay::update_state(const std::vector<MatrixBO> &WinL,
     leakyFactor = 1.0 - leaky;
 
     // update input
-    ArrayBO u(src.cols() + 1);
+    ArrayBO u = ArrayBO::Constant(src.cols() + 1, 1.0);
     size_t uSize = src.cols();
     u.head(uSize) = src;
 

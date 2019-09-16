@@ -52,12 +52,15 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
     //int lastNr = ESN.get_LayerConfig()[nLayers - 1].Nr + 1;
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
-    int fullNr, fullNrSWT;
-    fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
-    if(type ==1){
+    int fullNr, fullNrSWT = 0;
+    if(type == 1)
+    {
         fullNrSWT = std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT) + 1;
         outNr = fullNrSWT;
-    }else{
+    }
+    else
+    {
+        fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
         outNr = fullNr;
     }
     // Add Input dimension
@@ -73,7 +76,6 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
 
     // Compute State Structures
     MatrixBO trainState;
-    ArrayBO u = ArrayBO::Constant(Nu + 1, 1.0);
 
     // placeHolder Structures
     MatrixBO placeHolderInput = MatrixBO::Zero(blockSize, Nu);
@@ -108,11 +110,11 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
         // Compute State
         if (nLayers > 1)
         {
-            compute_state(trainState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, u, placeHolderSample, layerConfig);
+            compute_state(trainState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, placeHolderSample, layerConfig);
         }
         else
         {
-            compute_state(trainState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], u, placeHolderSample, layerConfig[0].leaky);
+            compute_state(trainState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], placeHolderSample, layerConfig[0].leaky);
         }
 
         MatrixBO reducedState(placeHolderTrainPoints, outNr);
@@ -187,14 +189,16 @@ MatrixBO EchoBay::readout_predict(Reservoir &ESN, const MatrixBO &inputData,
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
     int fullNr, fullNrSWT = 0;
-    fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
-    if(type ==1){
+    if(type == 1)
+    {
         fullNrSWT = std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT) + 1;
         outNr = fullNrSWT;
-    }else{
+    }
+    else
+    {
+        fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
         outNr = fullNr;
     }
-    //outNr = fullNr;
     // Add Input Dimension
     outNr += Nu;
 
@@ -208,7 +212,6 @@ MatrixBO EchoBay::readout_predict(Reservoir &ESN, const MatrixBO &inputData,
 
     // Compute State Structures
     MatrixBO valState;
-    ArrayBO u = ArrayBO::Constant(Nu + 1, 1.0);
     //std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
 
     // placeHolder Structures
@@ -234,11 +237,11 @@ MatrixBO EchoBay::readout_predict(Reservoir &ESN, const MatrixBO &inputData,
         // Compute State
         if (nLayers > 1)
         {
-            compute_state(valState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, u, placeHolderSample, layerConfig);
+            compute_state(valState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, placeHolderSample, layerConfig);
         }
         else
         {
-            compute_state(valState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], u, placeHolderSample, layerConfig[0].leaky);
+            compute_state(valState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], placeHolderSample, layerConfig[0].leaky);
         }
 
         MatrixBO reducedState(placeHolderTrainPoints, outNr);
