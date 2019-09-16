@@ -40,12 +40,26 @@ ArrayBO EchoBay::esn_caller(const Eigen::VectorXd &optParams, YAML::Node confPar
     // Build Reservoir object
     if (computationType == "train")
     {
+#ifdef _OPENMP
+    omp_lock_t guessLock;
+    omp_init_lock(&guessLock);
+#pragma omp parallel for
+#endif
+
         for (int i = 0; i < guesses; i++)
         {
             Reservoir ESN = esn_config(optParams, confParams, Nu, i, "");
-            std::cout << "Guess: " << i << " ";
             // Call rest of execution
             fitnessMatrix.row(i) = esn_train(confParams, ESN, lambda, problemType, fitnessRule, outputFolder, store, guessEval, i);
+#ifdef _OPENMP
+            omp_set_lock(&guessLock);
+#endif
+            std::cout << "Guess: " << i << " ";
+            std::cout << "multifitness " << fitnessMatrix.row(i).transpose() << std::endl;
+
+#ifdef _OPENMP
+            omp_unset_lock(&guessLock);
+#endif
         }
 
         // Calculate output: Train = Mean, Test = Worst Case
@@ -152,7 +166,6 @@ ArrayBO EchoBay::esn_compute(YAML::Node confParams, Reservoir &ESN, const DataSt
 {
 
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
-    int nLayers = ESN.get_nLayers();
     Comparator fitter(problemType, fitnessRule);
     fitter.set_targetLabel(store._evalLabel, store._evalSampling);
 
@@ -266,7 +279,7 @@ ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
     ArrayBO multiFitness(2);
     multiFitness(0) = fitness;
     multiFitness(1) = (memory);
-    std::cout << "multifitness " << multiFitness.transpose() << std::endl;
+    //std::cout << "multifitness " << multiFitness.transpose() << std::endl;
 
     // Flag used to save just when the parameters have been chosen
     // See main.cpp for clarity
