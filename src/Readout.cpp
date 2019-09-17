@@ -52,15 +52,15 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
     //int lastNr = ESN.get_LayerConfig()[nLayers - 1].Nr + 1;
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
-    int fullNr, fullNrSWT = 0;
+    int fullNr = 1,  fullNrSWT = 1;
     if(type == 1)
     {
-        fullNrSWT = std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT) + 1;
+        fullNrSWT += std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT);
         outNr = fullNrSWT;
     }
     else
     {
-        fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
+        fullNr += std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr);
         outNr = fullNr;
     }
     // Add Input dimension
@@ -188,15 +188,15 @@ MatrixBO EchoBay::readout_predict(Reservoir &ESN, const MatrixBO &inputData,
     //int lastNr = ESN.get_LayerConfig()[nLayers - 1].Nr + 1;
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
-    int fullNr, fullNrSWT = 0;
+    int fullNr = 1, fullNrSWT = 1;
     if(type == 1)
     {
-        fullNrSWT = std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT) + 1;
+        fullNrSWT += std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT);
         outNr = fullNrSWT;
     }
     else
     {
-        fullNr = std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr) + 1;
+        fullNr += std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr);
         outNr = fullNr;
     }
     // Add Input Dimension
