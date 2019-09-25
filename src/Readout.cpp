@@ -28,60 +28,37 @@ MatrixBO EchoBay::Wout_ridge(int rows, int cols, double lambda, Eigen::Ref<Matri
  * @brief Train readout layer based on training data, a given Reservoir and target
  * 
  * @param ESN Reservoir used to process data
- * @param trainData Eigen Matrix training data
- * @param sampleState Eigen Array defining data sampling
+ * @param store DataStorage containing input and sampling data
  * @param target Target data
  * @param lambda Regression lambda factor
  * @param blockStep Size of data blocks in samples to be used in training. Reduces memory footprint of application and optimize speed.
  * @return MatrixBO Learned Wout
  */
-MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
-                                const Eigen::Ref<const ArrayBO> sampleState,
-                                Eigen::Ref<MatrixBO> target, double lambda, int blockStep)
+MatrixBO EchoBay::readout_train(Reservoir &ESN, const DataStorage &store,
+                                Eigen::Ref<MatrixBO> target, double lambda,
+                                int blockStep)
 {
     // General Configuration
     int nLayers = ESN.get_nLayers();
-    int trainSamples = trainData.rows();
-    int Nu = trainData.cols();
+    int trainSamples = store.get_dataLength(EchoBay::Train);
+    int Nu = store.get_dataCols(EchoBay::Train);
+
+    // Get trainData
+    MatrixBO trainData = store.get_data(EchoBay::Train, EchoBay::selData);
 
     //Reservoir Type
     int type = ESN.get_ReservoirType();
 
     // Get outNr
-    int outNr;
-    //int lastNr = ESN.get_LayerConfig()[nLayers - 1].Nr + 1;
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
-    int fullNr = 1,  fullNrSWT = 1;
-    if(type == 1)
-    {
-        fullNrSWT += std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT);
-        outNr = fullNrSWT;
-    }
-    else
-    {
-        fullNr += std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr);
-        outNr = fullNr;
-    }
+    int fullNr = ESN.get_fullNr();
+    int outNr = (type == 1) ? ESN.get_NrSWT() : fullNr; 
     // Add Input dimension
     outNr += Nu;
-    
+
     // Get outDimension
     int outDimension = target.cols();
-
-    // Block size management
-    int start = 0, startTarget = 0, blockSize;
-    blockSize = trainSamples > blockStep ? blockStep : trainSamples;
-    int iterations = (int)ceil(trainSamples / (floatBO)blockSize);
-
-    // Compute State Structures
-    MatrixBO trainState;
-
-    // placeHolder Structures
-    MatrixBO placeHolderInput = MatrixBO::Zero(blockSize, Nu);
-    MatrixBO placeHolderTarget;
-    ArrayBO placeHolderSample(blockSize);
-    int placeHolderTrainPoints;
 
     // Wout Structures
     MatrixBO pinvState = MatrixBO::Zero(outNr, outNr);
@@ -94,65 +71,105 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
     // Wout structure
     MatrixBO Wout(outNr, outDimension);
 
-    for (int i = 0; i < iterations; ++i)
+    // Get number of independent sampleBatches
+    std::vector<ArrayI8> sampleBatches = store.get_samplingBatches(EchoBay::Train);
+    int nBatches = sampleBatches.size();
+
+    // Iterate on nBatches
+#pragma omp parallel for
+    for (int i = 0; i < nBatches; i++)
     {
-        // Isolate Input and Sample Vectors
-        placeHolderInput = trainData.block(start, 0, blockSize, Nu);
-        placeHolderSample = sampleState.segment(start, blockSize);
+        // Block size management
+        int batchSamples = sampleBatches[i].rows();
+        int start = 0, startSample = 0, startTarget = 0, blockSize;
+        blockSize = batchSamples > blockStep ? blockStep : batchSamples;
+        int iterations = (int)ceil(batchSamples / (floatBO)blockSize);
 
-        // How many Labels to isolate, taking in account how many state will be sampled
-        placeHolderTrainPoints = placeHolderSample.count();
-        // placeHolderTarget.resize(placeHolderTrainPoints, outDimension); Not needed
-        placeHolderTarget = target.block(startTarget, 0, placeHolderTrainPoints, outDimension);
+        // Compute State Structures
+        MatrixBO trainState;
 
-        // How many state will be sampled
-        trainState.resize(placeHolderTrainPoints, fullNr);
-        // Compute State
-        if (nLayers > 1)
-        {
-            compute_state(trainState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, placeHolderSample, layerConfig);
-        }
-        else
-        {
-            compute_state(trainState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], placeHolderSample, layerConfig[0].leaky);
-        }
+        // placeHolder Structures
+        MatrixBO placeHolderInput = MatrixBO::Zero(blockSize, Nu);
+        MatrixBO placeHolderTarget;
+        ArrayI8 placeHolderSample(blockSize);
+        int placeHolderTrainPoints;
 
-        MatrixBO reducedState(placeHolderTrainPoints, outNr);
-        MatrixBO cleanInput = clean_input(placeHolderInput, placeHolderSample);
-        if (type == 1)
+        // Identify starting point
+        start = store.get_dataOffset(EchoBay::Train, i);
+        startTarget = store.get_maxSamples(EchoBay::Train, i);
+
+        // Create placeholder states
+        std::vector<ArrayBO> placeHolderState;
+        placeHolderState = ESN.stateMat;
+
+        for (int j = 0; j < iterations; j++)
         {
-            int tempNR = 0;
-            int tempSWT = 0;
-            for (int i = 0; i < nLayers; ++i)
+            // Isolate Input and Sample Vectors
+            placeHolderInput = trainData.block(start, 0, blockSize, Nu);
+            placeHolderSample = sampleBatches[i].segment(startSample, blockSize);
+
+            // How many Labels to isolate, taking in account how many state will be sampled
+            placeHolderTrainPoints = placeHolderSample.count();
+            // placeHolderTarget.resize(placeHolderTrainPoints, outDimension); Not needed
+            placeHolderTarget = target.block(startTarget, 0, placeHolderTrainPoints, outDimension);
+
+            // How many state will be sampled
+            trainState.resize(placeHolderTrainPoints, fullNr);
+            trainState.setZero();
+
+            // Compute State
+            if (nLayers > 1)
             {
-                for (int j = 0; j < NOutindex[i].size(); ++j)
-                {
-                    reducedState.col(tempSWT+ j) = trainState.col(tempNR + NOutindex[i](j));
-                }
-                tempSWT += NOutindex[i].size();
-                tempNR  += layerConfig[i].Nr;
+                compute_state(trainState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, placeHolderState, placeHolderSample, layerConfig);
             }
-            reducedState.block(0, outNr-Nu-1, reducedState.rows(), 1) = trainState.col(fullNr-1);
-            reducedState.block(0, outNr-Nu, reducedState.rows(), Nu) = cleanInput;
-        }
-        else
-        {
-            reducedState << trainState, cleanInput;
-        }
-        // "Secure" sum
-        kahan_sum(reducedState.transpose() * reducedState, pinvState, pinvLOB);
-        kahan_sum(reducedState.transpose() * placeHolderTarget, stateTarget, stateTargetLOB);
+            else
+            {
+                compute_state(trainState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, placeHolderState[0], placeHolderSample, layerConfig[0].leaky);
+            }
 
-        // Basic sum
-        //stateTarget = stateTarget + trainState.transpose() * placeHolderTarget;
-        //pinvState = pinvState + trainState.transpose() * trainState;
+            MatrixBO reducedState = MatrixBO::Zero(placeHolderTrainPoints, outNr);
+            MatrixBO cleanInput = clean_input(placeHolderInput, placeHolderSample);
+            if (type == 1)
+            {
+                int tempNR = 0;
+                int tempSWT = 0;
+                for (int k = 0; k < nLayers; ++k)
+                {
+                    for (int l = 0; l < NOutindex[k].size(); ++l)
+                    {
+                        reducedState.col(tempSWT + l) = trainState.col(tempNR + NOutindex[k](l));
+                    }
+                    tempSWT += NOutindex[k].size();
+                    tempNR += layerConfig[k].Nr;
+                }
+                reducedState.block(0, outNr - Nu - 1, reducedState.rows(), 1) = trainState.col(fullNr - 1);
+                reducedState.block(0, outNr - Nu, reducedState.rows(), Nu) = cleanInput;
+            }
+            else
+            {
+                reducedState << trainState, cleanInput;
+            }
 
-        // Reset and update Starting Points and/or block dimension
-        trainState.setZero();
-        start += blockSize;
-        startTarget += placeHolderTrainPoints;
-        blockSize = blockStep < (trainSamples - start) ? blockStep : trainSamples - start;
+#pragma omp critical
+            {
+                // "Secure" sum
+                kahan_sum(reducedState.transpose() * reducedState, pinvState, pinvLOB);
+                kahan_sum(reducedState.transpose() * placeHolderTarget, stateTarget, stateTargetLOB);
+                // Basic sum
+                //stateTarget = stateTarget + trainState.transpose() * placeHolderTarget;
+                //pinvState = pinvState + trainState.transpose() * trainState;
+            }
+
+            // Reset and update Starting Points and/or block dimension
+            start += blockSize;
+            startTarget += placeHolderTrainPoints;
+            startSample += blockSize;
+            blockSize = blockStep < (trainSamples - start) ? blockStep : trainSamples - start;
+        }
+        //Save state TODO check if it is still necessary
+        ESN.stateMat = placeHolderState;
     }
+
     // Compute Final Wout
     pinvState = pinvState + MatrixBO::Identity(outNr, outNr) * lambda;
     pinvState = pinvState.completeOrthogonalDecomposition().pseudoInverse();
@@ -166,119 +183,134 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const MatrixBO &trainData,
  * @brief Perform prediction using a learned readout
  * 
  * @param ESN Reservoir used to process data
- * @param inputData Input data processed by the ESN
- * @param sampleState Eigen Array defining data sampling
+ * @param store DataStorage containing input and sampling data
  * @param Wout Readout matrix
  * @param blockStep Size of data blocks in samples to be used in training. Reduces memory footprint of application and optimize speed.
  * @return MatrixBO Prediction results
  */
-MatrixBO EchoBay::readout_predict(Reservoir &ESN, const MatrixBO &inputData, 
-                                  const Eigen::Ref<const ArrayBO> sampleState,
+MatrixBO EchoBay::readout_predict(Reservoir &ESN, const DataStorage &store,
                                   const Eigen::Ref<MatrixBO> Wout, int blockStep)
 {
     // General Configuration
     int nLayers = ESN.get_nLayers();
-    int valSamples = inputData.rows();
-    int Nu = inputData.cols();
+    int valSamples = store.get_dataLength(EchoBay::Valid);
+    int Nu = store.get_dataCols(EchoBay::Valid);
 
+    // Get trainData
+    MatrixBO evalData = store.get_data(EchoBay::Valid, EchoBay::selData);
+
+    // Get Reservoir type
     int type = ESN.get_ReservoirType();
 
     // get outNr
-    int outNr;
-    //int lastNr = ESN.get_LayerConfig()[nLayers - 1].Nr + 1;
     std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     std::vector<ArrayI> NOutindex = ESN.get_WoutIndex();
-    int fullNr = 1, fullNrSWT = 1;
-    if(type == 1)
-    {
-        fullNrSWT += std::accumulate(NOutindex.begin(), NOutindex.end(), 0, sumNrSWT);
-        outNr = fullNrSWT;
-    }
-    else
-    {
-        fullNr += std::accumulate(layerConfig.begin(), layerConfig.end(), 0, sumNr);
-        outNr = fullNr;
-    }
+    int fullNr = ESN.get_fullNr();
+    int outNr = (type == 1) ? ESN.get_NrSWT() : fullNr; 
     // Add Input Dimension
     outNr += Nu;
 
     // Get outDimension
     int outDimension = Wout.cols();
 
-    // Block size management
-    int start = 0, startTarget = 0, blockSize;
-    blockSize = valSamples > blockStep ? blockStep : valSamples;
-    int iterations = (int)ceil(valSamples / (floatBO)blockSize);
+    // Get number of independent sampleBatches
+    std::vector<ArrayI8> sampleBatches = store.get_samplingBatches(EchoBay::Valid);
+    int nBatches = sampleBatches.size();
 
-    // Compute State Structures
-    MatrixBO valState;
-    //std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
+    // Prediction Structure
+    int stateCount = store.get_maxSamples(EchoBay::Valid);
+    MatrixBO prediction(stateCount, outDimension);
 
-    // placeHolder Structures
-    MatrixBO placeHolderInput = MatrixBO::Zero(blockSize, Nu);
-    MatrixBO placeHolderTarget;
-    ArrayBO placeHolderSample(blockSize);
-    int placeHolderTrainPoints;
-
-    //Prediction Structure
-    MatrixBO prediction(sampleState.count(), outDimension);
-
-    for (int i = 0; i < iterations; ++i)
+    // Iterate on nBatches
+#pragma omp parallel for
+    for (int i = 0; i < nBatches; i++)
     {
-        // Isolate Input and Sample Vectors
-        placeHolderInput = inputData.block(start, 0, blockSize, Nu);
-        placeHolderSample = sampleState.segment(start, blockSize);
-        // How many Labels to isolate, taking in account how many state will be sampled
-        placeHolderTrainPoints = placeHolderSample.count();
+        // Block size management
+        int batchSamples = sampleBatches[i].rows();
+        int start = 0, startSample = 0, startTarget = 0, blockSize;
+        blockSize = batchSamples > blockStep ? blockStep : batchSamples;
+        int iterations = (int)ceil(batchSamples / (floatBO)blockSize);
 
-        // How many state will be sampled
-        valState.resize(placeHolderTrainPoints, fullNr);
+        // Compute State Structures
+        MatrixBO valState;
 
-        // Compute State
-        if (nLayers > 1)
-        {
-            compute_state(valState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, ESN.stateMat, placeHolderSample, layerConfig);
-        }
-        else
-        {
-            compute_state(valState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, ESN.stateMat[0], placeHolderSample, layerConfig[0].leaky);
-        }
+        // placeHolder Structures
+        MatrixBO placeHolderInput = MatrixBO::Zero(blockSize, Nu);
+        MatrixBO placeHolderTarget;
+        ArrayI8 placeHolderSample(blockSize);
+        int placeHolderTrainPoints;
 
-        MatrixBO reducedState(placeHolderTrainPoints, outNr);
-        MatrixBO cleanInput = clean_input(placeHolderInput, placeHolderSample);
-        if (type == 1)
+        // Identify starting point
+        start = store.get_dataOffset(EchoBay::Valid, i);
+        startTarget = store.get_maxSamples(EchoBay::Valid, i);
+
+        // Create placeholder states
+        std::vector<ArrayBO> placeHolderState;
+        placeHolderState = ESN.stateMat;
+
+        // Iterate the single batch
+        for (int j = 0; j < iterations; j++)
         {
-            int tempNR = 0;
-            int tempSWT = 0;
-            for (int i = 0; i < nLayers; ++i)
+            // Isolate Input and Sample Vectors
+            placeHolderInput = evalData.block(start, 0, blockSize, Nu);
+            placeHolderSample = sampleBatches[i].segment(startSample, blockSize); //sampleState.segment(start, blockSize);
+
+            // How many Labels to isolate, taking in account how many state will be sampled
+            placeHolderTrainPoints = placeHolderSample.count();
+
+            // How many state will be sampled
+            valState.resize(placeHolderTrainPoints, fullNr);
+            valState.setZero();
+
+            // Compute State
+            if (nLayers > 1)
             {
-                for (int j = 0; j < NOutindex[i].size(); ++j)
-                {
-                    reducedState.col(tempSWT+ j) = valState.col(tempNR + NOutindex[i](j));
-
-                }
-                tempSWT += NOutindex[i].size();
-                tempNR  += layerConfig[i].Nr;
+                compute_state(valState, ESN.WinLayers, ESN.WrLayers, placeHolderInput, placeHolderState, placeHolderSample, layerConfig);
             }
-            reducedState.block(0, outNr - Nu - 1, reducedState.rows(), 1) = valState.col(fullNr-1);
-            reducedState.block(0, outNr - Nu, reducedState.rows(), Nu) = cleanInput;
-        }
-        else
-        {
-            reducedState << valState, cleanInput;
-        }
+            else
+            {
+                compute_state(valState, ESN.WinLayers[0], ESN.WrLayers[0], placeHolderInput, placeHolderState[0], placeHolderSample, layerConfig[0].leaky);
+            }
 
-        //Compute Prediction
-        for (int j = 0; j < placeHolderTrainPoints; ++j)
-        {
-            prediction.row(startTarget + j) = reducedState.row(j).matrix() * Wout;
-        }
+            MatrixBO reducedState = MatrixBO::Zero(placeHolderTrainPoints, outNr);
+            MatrixBO cleanInput = clean_input(placeHolderInput, placeHolderSample);
+            if (type == 1)
+            {
+                int tempNR = 0;
+                int tempSWT = 0;
+                for (int k = 0; k < nLayers; ++k)
+                {
+                    for (int l = 0; l < NOutindex[k].size(); ++l)
+                    {
+                        reducedState.col(tempSWT + l) = valState.col(tempNR + NOutindex[k](l));
+                    }
+                    tempSWT += NOutindex[k].size();
+                    tempNR += layerConfig[k].Nr;
+                }
+                reducedState.block(0, outNr - Nu - 1, reducedState.rows(), 1) = valState.col(fullNr - 1);
+                reducedState.block(0, outNr - Nu, reducedState.rows(), Nu) = cleanInput;
+            }
+            else
+            {
+                reducedState << valState, cleanInput;
+            }
 
-        // Reset and update Starting Points and/or block dimension
-        valState.setZero();
-        start += blockSize;
-        startTarget += placeHolderTrainPoints;
-        blockSize = blockStep < (valSamples - start) ? blockStep : valSamples - start;
+#pragma omp critical
+            {
+                //Compute Prediction
+                for (int k = 0; k < placeHolderTrainPoints; ++k)
+                {
+                    prediction.row(startTarget + k) = reducedState.row(k).matrix() * Wout;
+                }
+            }
+
+            // Reset and update Starting Points and/or block dimension
+            start += blockSize;
+            startTarget += placeHolderTrainPoints;
+            blockSize = blockStep < (valSamples - start) ? blockStep : valSamples - start;
+        }
+        //Save state TODO check if it is still necessary
+        ESN.stateMat = placeHolderState;
     }
 
     return prediction;
@@ -318,18 +350,18 @@ void EchoBay::kahan_sum(MatrixBO Input, Eigen::Ref<MatrixBO> Sum, Eigen::Ref<Mat
  * @param sampleState Sampling array
  * @return MatrixBO Cleaned data
  */
-MatrixBO EchoBay::clean_input(const Eigen::Ref<const MatrixBO> input, const Eigen::Ref<const ArrayBO> sampleState)
+MatrixBO EchoBay::clean_input(const Eigen::Ref<const MatrixBO> input, const Eigen::Ref<const ArrayI8> sampleState)
 {
     int outRows = 0;
-    MatrixBO inputCleaned(sampleState.count(), input.cols());
-        for (int s = 0; s < sampleState.rows(); s++)
+    MatrixBO inputCleaned = MatrixBO::Zero(sampleState.count(), input.cols());
+    for (int s = 0; s < sampleState.rows(); s++)
+    {
+        if (sampleState(s) != 0)
         {
-            if (sampleState(s) != 0)
-            {
-                inputCleaned.row(outRows) = input.row(s);
-                outRows++;
-            }
+            inputCleaned.row(outRows) = input.row(s);
+            outRows++;
         }
-        
+    }
+
     return inputCleaned;
 }
