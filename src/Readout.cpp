@@ -165,6 +165,7 @@ MatrixBO EchoBay::readout_train(Reservoir &ESN, const DataStorage &store,
             startTarget += placeHolderTrainPoints;
             startSample += blockSize;
             blockSize = blockStep < (trainSamples - start) ? blockStep : trainSamples - start;
+            blockSize = (startSample + blockSize) < batchSamples ? blockSize : (batchSamples - startSample);
         }
         //Save state TODO check if it is still necessary
         ESN.stateMat = placeHolderState;
@@ -308,6 +309,7 @@ MatrixBO EchoBay::readout_predict(Reservoir &ESN, const DataStorage &store,
             start += blockSize;
             startTarget += placeHolderTrainPoints;
             blockSize = blockStep < (valSamples - start) ? blockStep : valSamples - start;
+            blockSize = (startSample + blockSize) < batchSamples ? blockSize : (batchSamples - startSample);
         }
         //Save state TODO check if it is still necessary
         ESN.stateMat = placeHolderState;
