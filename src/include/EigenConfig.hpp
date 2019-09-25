@@ -9,6 +9,7 @@
 typedef double floatBO;
 typedef Eigen::ArrayXd ArrayBO;
 typedef Eigen::ArrayXi ArrayI;
+typedef Eigen::Array<int8_t, Eigen::Dynamic, 1> ArrayI8;
 typedef Eigen::MatrixXd MatrixBO;
 typedef Eigen::VectorXcd VComplexBO;
 typedef Eigen::Triplet<floatBO> TripletBO;
