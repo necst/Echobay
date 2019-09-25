@@ -14,7 +14,7 @@ using namespace Eigen;
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
                            Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
                            Eigen::Ref<ArrayBO> stateArr,
-                           const Eigen::Ref<const ArrayBO> sampleState)
+                           const Eigen::Ref<const ArrayI8> sampleState)
 {
     size_t trainSamples = src.rows();
     MatrixBO u(src.cols()+1, src.rows());
@@ -54,7 +54,7 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
                            Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
                            Eigen::Ref<ArrayBO> stateArr,
-                           const Eigen::Ref<const ArrayBO> sampleState, floatBO leaky)
+                           const Eigen::Ref<const ArrayI8> sampleState, floatBO leaky)
 {
     size_t trainSamples = src.rows();
     MatrixBO u(src.cols()+1, src.rows());
@@ -101,7 +101,7 @@ void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
 void EchoBay::compute_state(Eigen::Ref<MatrixBO> dst, const std::vector<MatrixBO> &WinL,
                            const std::vector<SparseBO> &WrL,
                            const MatrixBO &src, std::vector<ArrayBO> &stateMat,
-                           const Eigen::Ref<const ArrayBO> sampleState,
+                           const Eigen::Ref<const ArrayI8> sampleState,
                            const std::vector<layerParameter> &layerConfig)
 {
     // Variables

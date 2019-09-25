@@ -18,8 +18,8 @@ using namespace std::chrono;
  * @return ArrayBO Return fitness value to the Bayesian Optimizer
  */
 ArrayBO EchoBay::esn_caller(const Eigen::VectorXd &optParams, YAML::Node confParams, 
-                       std::string outputFolder, const DataStorage &store, 
-                       bool guessEval, const std::string &computationType, 
+                       const std::string outputFolder, const DataStorage &store, 
+                       const bool guessEval, const std::string &computationType, 
                        const std::string &matrixFolder)
 {
     // Number of guesses
@@ -35,17 +35,16 @@ ArrayBO EchoBay::esn_caller(const Eigen::VectorXd &optParams, YAML::Node confPar
     // Readout blockStep
     int blockStep = confParams["blockStep"].as<int>();
     // Limits
-    int Nu = store._trainData.cols() + 1;
+    int Nu = store.get_dataCols(EchoBay::Train) + 1;
 
     // Build Reservoir object
     if (computationType == "train")
     {
 #ifdef _OPENMP
-    omp_lock_t guessLock;
-    omp_init_lock(&guessLock);
+        omp_lock_t guessLock;
+        omp_init_lock(&guessLock);
 #pragma omp parallel for
 #endif
-
         for (int i = 0; i < guesses; i++)
         {
             Reservoir ESN = esn_config(optParams, confParams, Nu, i, "");
@@ -55,8 +54,7 @@ ArrayBO EchoBay::esn_caller(const Eigen::VectorXd &optParams, YAML::Node confPar
             omp_set_lock(&guessLock);
 #endif
             std::cout << "Guess: " << i << " ";
-            std::cout << "multifitness " << fitnessMatrix.row(i).transpose() << std::endl;
-
+            std::cout << "multifitness " << fitnessMatrix.row(i) << std::endl;
 #ifdef _OPENMP
             omp_unset_lock(&guessLock);
 #endif
@@ -102,7 +100,8 @@ ArrayBO EchoBay::esn_caller(const Eigen::VectorXd &optParams, YAML::Node confPar
  * @param folder Path to the folder where Reservoir matrices will be saved or loaded
  * @return Reservoir Configured Reservoir object
  */
-Reservoir EchoBay::esn_config(const Eigen::VectorXd &optParams, YAML::Node confParams, int Nu, int guess, const std::string folder)
+Reservoir EchoBay::esn_config(const Eigen::VectorXd &optParams, YAML::Node confParams, 
+                         const int Nu, const int guess, const std::string folder)
 {
     // ESN general Parameters
     // Deep ESN
@@ -137,9 +136,9 @@ Reservoir EchoBay::esn_config(const Eigen::VectorXd &optParams, YAML::Node confP
     // Print parameters
     if (guess == 0)
     {
-        std::cout << "\nTopology: "<< ESNTypes[type] << std::endl;
+        std::cout << "\nTopology: " << ESNTypes[type] << std::endl;
         ESN.print_params(nLayers, nWashout, lambda);
-    }  
+    }
 
     return ESN;
 }
@@ -160,21 +159,16 @@ Reservoir EchoBay::esn_config(const Eigen::VectorXd &optParams, YAML::Node confP
  * @return ArrayBO Return fitness value to the Bayesian Optimizer
  */
 ArrayBO EchoBay::esn_compute(YAML::Node confParams, Reservoir &ESN, const DataStorage &store, 
-                             const std::string &problemType, const std::string &fitnessRule, 
-                             int blockStep, Eigen::Ref<MatrixBO> Wout,
-                             const std::string &outputFolder, bool saveflag, int guesses)
+                        const std::string &problemType, const std::string &fitnessRule, 
+                        const int blockStep, Eigen::Ref<MatrixBO> Wout, 
+                        const std::string &outputFolder, const bool saveflag, const int guesses)
 {
-
-    std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
     Comparator fitter(problemType, fitnessRule);
-    fitter.set_targetLabel(store._evalLabel, store._evalSampling);
-
-    int Nu = store._evalData.cols() + 1; // Extract info on number of columns of train data + bias vector
-
-    ArrayBO u = ArrayBO::Constant(Nu, 1.0);
+    ArrayI8 evalSampling = store.get_sampleArray(EchoBay::Valid);
+    fitter.set_targetLabel(store.get_data(EchoBay::Valid, EchoBay::selLabel), evalSampling);
 
     // Compute Prediction
-    MatrixBO prediction = readout_predict(ESN, store._evalData, store._evalSampling, Wout, blockStep);
+    MatrixBO prediction = readout_predict(ESN, store, Wout, blockStep);
 
     // Calculate fitness
     // Resize output
@@ -203,7 +197,6 @@ ArrayBO EchoBay::esn_compute(YAML::Node confParams, Reservoir &ESN, const DataSt
         //nameOut = "/final_state_" + std::to_string(guesses) + ".dat";
         //write_array<ArrayBO>(outputFolder + std::string(nameOut), valState.row(valPoints - 1));
     }
-    //return fitness - MemoryPenFactor * Memory;
     return multiFitness;
 }
 
@@ -223,34 +216,26 @@ ArrayBO EchoBay::esn_compute(YAML::Node confParams, Reservoir &ESN, const DataSt
  * @param guesses Number of guesses to be evaluated (used for output naming)
  * @return ArrayBO Return fitness value to the Bayesian Optimizer
  */
-ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
-                      std::string problemType, std::string fitnessRule,
-                      std::string outputFolder, const DataStorage &store, bool saveflag, 
-                      int guesses)
+ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, const double lambda,
+                      const std::string problemType, const std::string fitnessRule,
+                      const std::string outputFolder, const DataStorage &store, const bool saveflag, 
+                      const int guesses)
 {
-    // Data size
-    int Nu = store._trainData.cols() + 1; // Extract info on number of columns of train data + bias vector
-
     // ESN general Parameters
     // Deep ESN
     int nLayers = ESN.get_nLayers();
     // Readout blockStep
     int blockStep = confParams["blockStep"].as<int>();
 
-    // Get the configuration of each layer
-    std::vector<layerParameter> layerConfig = ESN.get_LayerConfig();
-
-    // Initialize input array with bias
-    ArrayBO u = ArrayBO::Constant(Nu, 1.0);
-
     // Construct comparator class
     Comparator fitter(problemType, fitnessRule);
 
     // Calculate readout matrix depending on the problem
-    MatrixBO targetMatrix = fitter.get_targetMatrix(store._trainLabel, store._trainSampling);
+    ArrayI8 trainSampling = store.get_sampleArray(EchoBay::Train);
+    MatrixBO targetMatrix = fitter.get_targetMatrix(store.get_data(EchoBay::Train, EchoBay::selLabel), trainSampling);
 
     // Calculate Wout as readout layer
-    MatrixBO Wout = readout_train(ESN, store._trainData, store._trainSampling, targetMatrix, lambda, blockStep);
+    MatrixBO Wout = readout_train(ESN, store, targetMatrix, lambda, blockStep);
     // Calculate prediction states
     // stateMat is already initialized with last training state
 
@@ -262,13 +247,14 @@ ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
         saveState = ESN.stateMat;
     }
 
-    MatrixBO prediction = readout_predict(ESN, store._evalData, store._evalSampling, Wout, blockStep);
+    MatrixBO prediction = readout_predict(ESN, store, Wout, blockStep);
 
     // Calculate fitness
     // Resize output
     fitter.set_label_size(prediction.rows(), prediction.cols());
     // Get fitness
-    fitter.set_targetLabel(store._evalLabel, store._evalSampling);
+    ArrayI8 evalSampling = store.get_sampleArray(EchoBay::Valid);
+    fitter.set_targetLabel(store.get_data(EchoBay::Valid, EchoBay::selLabel), evalSampling);
     floatBO fitness = fitter.get_fitness(prediction);
 
     MatrixBO outputLabel;
@@ -278,8 +264,7 @@ ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
     floatBO memory = ESN.return_net_dimension(confParams);
     ArrayBO multiFitness(2);
     multiFitness(0) = fitness;
-    multiFitness(1) = (memory);
-    //std::cout << "multifitness " << multiFitness.transpose() << std::endl;
+    multiFitness(1) = memory;
 
     // Flag used to save just when the parameters have been chosen
     // See main.cpp for clarity
@@ -314,11 +299,10 @@ ArrayBO EchoBay::esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
 
         write_matrix<MatrixBO>(outputFolder + std::string("/Wout_eigen.dat"), Wout);
 
-        if(confParams["Guesses"].as<int>() == (guesses+1))
+        if (confParams["Guesses"].as<int>() == (guesses + 1))
         {
             std::cout << "Computation ended \n";
         }
-        
     }
 
     //return fitness - MemoryPenFactor * Memory;

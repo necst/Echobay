@@ -143,7 +143,7 @@ int EchoBay::Comparator::get_nClasses()
  * @param sampleState Eigen Array containing the sampling index to manage ESN washout
  * see also EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData, int nWashout, bool init_flag, const std::string &problemType, const std::string type)
  */
-void EchoBay::Comparator::set_targetLabel(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayBO> sampleState)
+void EchoBay::Comparator::set_targetLabel(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayI8> sampleState)
 {
     if (_problemType == "Classification")
     {
@@ -181,7 +181,7 @@ void EchoBay::Comparator::set_targetLabel(const Eigen::Ref<const MatrixBO> label
  * @return MatrixBO Problem dependent target matrix used for readout calculation
  * see also MatrixBO EchoBay::Wout_ridge(int rows, int cols, double lambda, Eigen::Ref<MatrixBO> biasedState, Eigen::Ref<MatrixBO> target)
  */
-MatrixBO EchoBay::Comparator::get_targetMatrix(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayBO> sampleState)
+MatrixBO EchoBay::Comparator::get_targetMatrix(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayI8> sampleState)
 {
     if (_problemType == "Classification")
     {

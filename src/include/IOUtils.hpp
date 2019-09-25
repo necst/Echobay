@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <numeric>
 #include <fstream>
-#include <iostream>
 #include <iomanip>
 
 #if !defined(ESP_PLATFORM)
@@ -14,7 +13,7 @@
 
 #include "yaml-cpp/yaml.h"
 #include <boost/algorithm/string/replace.hpp>
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 #include <unsupported/Eigen/src/SparseExtra/MarketIO.h>
 
 /**

@@ -11,7 +11,7 @@
 #ifdef USE_TBB
 #include <tbb/mutex.h>
 #endif
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 
 namespace EchoBay   
 {
@@ -37,8 +37,8 @@ namespace EchoBay
         void set_label_size(int rows, int cols);
         floatBO get_fitness(Eigen::Ref<MatrixBO> predict);
         MatrixBO get_outputlabel() { return _outputLabel; };
-        void set_targetLabel(     const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayBO> sampleState);
-        MatrixBO get_targetMatrix(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayBO> sampleState);
+        void set_targetLabel(     const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayI8> sampleState);
+        MatrixBO get_targetMatrix(const Eigen::Ref<const MatrixBO> label, const Eigen::Ref<const ArrayI8> sampleState);
 
         void one_hot_encoding(Eigen::Ref<MatrixBO> Dst, MatrixBO Src);
         int get_nClasses();

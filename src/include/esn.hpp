@@ -14,7 +14,7 @@
 #include "FitnessFunctions.hpp"
 #include "ComputeState.hpp"
 
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 #include "IOUtils.hpp"
 #include "DataStorage.hpp"
 #include "Readout.hpp"
@@ -22,28 +22,28 @@
 namespace EchoBay
 {
     ArrayBO esn_caller(const Eigen::VectorXd &optParams, YAML::Node confParams, 
-                       std::string outputFolder, const DataStorage &store, 
-                       bool guessEval, const std::string &computationType, 
+                       const std::string outputFolder, const DataStorage &store, 
+                       const bool guessEval, const std::string &computationType, 
                        const std::string &matrixFolder);
     
     Reservoir esn_config(const Eigen::VectorXd &optParams, YAML::Node confParams, 
-                         int Nu, int guess, const std::string folder);
+                         const int Nu, const int guess, const std::string folder);
 
-    ArrayBO esn_train(YAML::Node confParams, Reservoir &ESN, double lambda,
-                      std::string problemType, std::string fitnessRule,
-                      std::string outputFolder, const DataStorage &store, bool saveflag, 
-                      int guesses);
+    ArrayBO esn_train(YAML::Node confParams, Reservoir &ESN, const double lambda,
+                      const std::string problemType, const std::string fitnessRule,
+                      const std::string outputFolder, const DataStorage &store, const bool saveflag, 
+                      const int guesses);
 
     ArrayBO esn_compute(YAML::Node confParams, Reservoir &ESN, const DataStorage &store, 
                         const std::string &problemType, const std::string &fitnessRule, 
-                        int blockStep, Eigen::Ref<MatrixBO> Wout, 
-                        const std::string &outputFolder, bool saveflag, int guesses);
+                        const int blockStep, Eigen::Ref<MatrixBO> Wout, 
+                        const std::string &outputFolder, const bool saveflag, const int guesses);
 
     floatBO esn_compute(const MatrixBO &input_data, const std::string &folder);
 
-    MatrixBO compute_prediction(int outNr, int outDimension,
+    MatrixBO compute_prediction(const int outNr, const int outDimension,
                             const Eigen::Ref<MatrixBO> Wout, 
-                            Reservoir &ESN,const MatrixBO &src,
+                            Reservoir &ESN, const MatrixBO &src,
                             const Eigen::Ref<const ArrayBO> sampleState);
 } // namespace EchoBay
 

@@ -3,7 +3,7 @@
 
 
 //#include "Reservoir.hpp" // Not necessary all Reservoir.hpp
-#include "EigenConfig.hpp" // Due to Eigen Vector X.
+#include "EchoBay.hpp" // Due to Eigen Vector X.
 #include "yaml-cpp/yaml.h"
 
 typedef std::map<std::string, Eigen::VectorXd> stringdouble_t;

@@ -1,25 +1,25 @@
 #ifndef COMPUTESTATE_HPP
 #define COMPUTESTATE_HPP
 
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 #include "Reservoir.hpp"
 
 namespace EchoBay
 { // Simple state ESN
 void compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
                   Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
-                  Eigen::Ref<ArrayBO> stateArr, Eigen::Ref<ArrayBO> u,
-                  const Eigen::Ref<const ArrayBO> sample_state);
+                  Eigen::Ref<ArrayBO> stateArr,
+                  const Eigen::Ref<const ArrayI8> sampleState);
 // Leaky state ESN
 void compute_state(Eigen::Ref<MatrixBO> dst, Eigen::Ref<MatrixBO> Win,
-                  Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
-                  Eigen::Ref<ArrayBO> stateArr, Eigen::Ref<ArrayBO> u,
-                  const Eigen::Ref<const ArrayBO> sample_state, floatBO leaky);
+                           Eigen::Ref<SparseBO> Wr, const MatrixBO &src,
+                           Eigen::Ref<ArrayBO> stateArr, 
+                           const Eigen::Ref<const ArrayI8> sampleState, floatBO leaky);
 // Deep ESN
 void compute_state(Eigen::Ref<MatrixBO> dst, const std::vector<MatrixBO> &WinL,
                   const std::vector<SparseBO> &WrL,
                   const MatrixBO &src, std::vector<ArrayBO> &stateMat,
-                  Eigen::Ref<ArrayBO> u, const Eigen::Ref<const ArrayBO> sampleState,
+                  const Eigen::Ref<const ArrayI8> sampleState,
                   const std::vector<layerParameter> &layerConfig);
 
 // Single Deep ESN update
