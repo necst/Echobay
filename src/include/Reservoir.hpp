@@ -9,7 +9,7 @@
 #include <spectra/MatOp/SparseGenMatProd.h>
 #include <spectra/SymEigsSolver.h>
 #include <exception>
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 #include "yaml-cpp/yaml.h"
 #include "Eigen/StdVector"
 
@@ -61,24 +61,8 @@ namespace EchoBay
      */
     class Reservoir
     {
-        protected:
-        void wr_random_fill(SparseBO &Wr, int Nr,  int active_units, std::unordered_set< std::pair<int,int>, pair_hash> &valid_idx_hash);
-        void wr_swt_fill(   SparseBO &Wr, int Nr,  int edges,        std::unordered_set<std::pair<int, int>, pair_hash> &valid_idx_hash);
-        void wr_crj_fill(   SparseBO &Wr, int Nr,  int jumps,        std::unordered_set<std::pair<int, int>, pair_hash> &valid_idx_hash);
-        floatBO wr_scale_radius(SparseBO &Wr, const double scalingFactor);
-
-        // Internal variables
-        int _nLayers;
-        int _Nu;
-        std::vector<layerParameter> _layerConfig;
-        int _type; // 0 for Random, 1 for SWT, 2 for CRJ
-        // SWT Structures
-        std::vector<ArrayI> _WinIndex;
-        std::vector<ArrayI> _WoutIndex;
-        std::string _reservoirInizialization = "radius";
-
         public:
-        Reservoir(int nLayers = 1, int Nu = 2, int type = 0);
+        Reservoir(const int nLayers = 1, const int Nu = 2, const int type = 0);
         ~Reservoir();
         SparseBO init_Wr(const int Nr, const double density, const double scalingFactor, const double leaky, const int extraParams);
 
@@ -104,28 +88,46 @@ namespace EchoBay
 #endif
 
         // LayerConfig functions
-        void init_LayerConfig(const Eigen::VectorXd &optParams, YAML::Node confParams);
+        void init_LayerConfig(const Eigen::VectorXd &optParams, const YAML::Node confParams);
         void init_LayerConfig(std::vector<stringdouble_t> paramValue);
-        std::vector<layerParameter> get_LayerConfig();
-        int get_nLayers();
+        std::vector<layerParameter> get_LayerConfig() const;
+        int get_nLayers() const;
+        int get_fullNr(const int layer = -1) const;
         // SWT structures
-        std::vector<ArrayI> get_WinIndex();
-        std::vector<ArrayI> get_WoutIndex();
+        std::vector<ArrayI> get_WinIndex() const;
+        std::vector<ArrayI> get_WoutIndex() const;
+        int get_NrSWT(const int layer = -1) const;
 
-        //Utils for Reservoir
-        int get_ReservoirType();
+        // Utils for Reservoir
+        int get_ReservoirType() const;
         //std::vector<int> pick(int Nr, int k); 
         ArrayI pick(int Nr, int k); 
         std::unordered_set<int> pickSet(int N, int k, std::mt19937& gen);
 
         // Print parameters
         void print_params(const int nLayers, const int nWashout, const double lambda);
-        floatBO return_net_dimension(YAML::Node confParams);
+        floatBO return_net_dimension(const YAML::Node confParams) const;
+
         // Reservoir elements
         std::vector<MatrixBO> WinLayers;
         std::vector<SparseBO> WrLayers;
         std::vector<ArrayBO> stateMat;
-        
+
+        private:
+        void wr_random_fill(SparseBO &Wr, int Nr,  int active_units, std::unordered_set< std::pair<int,int>, pair_hash> &valid_idx_hash);
+        void wr_swt_fill(   SparseBO &Wr, int Nr,  int edges,        std::unordered_set<std::pair<int, int>, pair_hash> &valid_idx_hash);
+        void wr_crj_fill(   SparseBO &Wr, int Nr,  int jumps,        std::unordered_set<std::pair<int, int>, pair_hash> &valid_idx_hash);
+        floatBO wr_scale_radius(SparseBO &Wr, const double scalingFactor);
+
+        // Internal variables
+        int _nLayers;
+        int _Nu;
+        std::vector<layerParameter> _layerConfig;
+        int _type; // 0 for Random, 1 for SWT, 2 for CRJ
+        // SWT Structures
+        std::vector<ArrayI> _WinIndex;
+        std::vector<ArrayI> _WoutIndex;
+        std::string _reservoirInizialization = "radius";        
     };
 
 } // namespace EchoBay

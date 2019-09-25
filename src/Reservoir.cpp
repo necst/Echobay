@@ -29,7 +29,7 @@ class WrException: public std::exception
  * @param type Topology of the network see also EchoBay::esn_config(const Eigen::VectorXd &optParams, YAML::Node confParams, int Nu, const std::string folder)
  * for details
  */
-EchoBay::Reservoir::Reservoir(int nLayers, int Nu, int type)
+EchoBay::Reservoir::Reservoir(const int nLayers, const int Nu, const int type)
 {
     // Save layers
     _nLayers = nLayers;
@@ -137,8 +137,7 @@ void EchoBay::Reservoir::init_WinLayers_swt()
     // Homogeneous scaling
     if (countScale == 1)
     {
-        MatrixBO temp(_layerConfig[0].Nr, _Nu);
-        temp.setZero();
+        MatrixBO temp = MatrixBO::Zero(_layerConfig[0].Nr, _Nu);
         temp.block(0,0,NiCount, _Nu) = _layerConfig[0].scaleInput[0] * MatrixBO::Random(NiCount, _Nu);
 
         WinLayers.push_back(temp);
@@ -149,9 +148,8 @@ void EchoBay::Reservoir::init_WinLayers_swt()
         MatrixBO Win(_layerConfig[0].Nr, _Nu);
         for (int cols = _Nu - 1; cols >= 0; cols--)
         {
-            MatrixBO temp(_layerConfig[0].Nr, 1);
+            MatrixBO temp = MatrixBO::Zero(_layerConfig[0].Nr, 1);
             // Select a block of inputs
-            temp.setZero();
             temp.block(0,0,NiCount, 1) =  _layerConfig[0].scaleInput[cols] * MatrixBO::Random(NiCount, 1);
             Win.col(cols) = temp;
         }
@@ -161,8 +159,7 @@ void EchoBay::Reservoir::init_WinLayers_swt()
     // Fill subsequent layers
     for (int i = 1; i < _nLayers; ++i)
     {
-        MatrixBO temp(_layerConfig[i].Nr, _layerConfig[i-1].Nr + 1);
-        temp.setZero();
+        MatrixBO temp = MatrixBO::Zero(_layerConfig[i].Nr, _layerConfig[i-1].Nr + 1);
         NiCount = NIindex[i].size();
         NoCount = NOIndex[i-1].size();
         temp.block(0,floor(_layerConfig[i-1].Nr/2),NiCount, NoCount) = _layerConfig[i].scaleInput[0] * MatrixBO::Random(NiCount, NoCount);
@@ -191,15 +188,8 @@ void EchoBay::Reservoir::init_WinLayers_crj()
     std::bernoulli_distribution probability(0.5);
 
     // Determine Win sign
-    MatrixBO temp;
-    temp.resize(_layerConfig[0].Nr, _Nu);
-    for (int i = 0; i < _layerConfig[0].Nr; ++i)
-    {
-        for (int j = 0; j < _Nu; ++j)
-        {
-            temp(i,j) = probability(gen) ? 1 : -1;            
-        }
-    }
+    auto opSign = [&](void){return probability(gen) ? 1 : -1;};
+    MatrixBO temp = MatrixBO::NullaryExpr(_layerConfig[0].Nr, _Nu, opSign); // Apply value using lambda
 
     // Homogeneous scaling
     if (countScale == 1)
@@ -219,14 +209,7 @@ void EchoBay::Reservoir::init_WinLayers_crj()
     // Fill subsequent layers
     for (int i = 1; i < _nLayers; ++i)
     {
-        temp.resize(_layerConfig[i].Nr, _layerConfig[i - 1].Nr + 1);
-        for (int j = 0; j < _layerConfig[i].Nr; ++j)
-        {
-            for (int k = 0; k < _layerConfig[i - 1].Nr + 1; ++k)
-            {
-                temp(j,k) = probability(gen) ? 1 : -1;
-            }
-        }
+        temp = MatrixBO::NullaryExpr(_layerConfig[i].Nr, _layerConfig[i - 1].Nr + 1, opSign);
         WinLayers.push_back(_layerConfig[i].scaleInput[0] * temp);
     }
 }
@@ -239,9 +222,9 @@ void EchoBay::Reservoir::init_stateMat()
 {
     // Clear state vector
     stateMat.clear();
-    for (int i = 0; i < _nLayers; ++i)
+    for (const auto& layer: _layerConfig)
     {
-        stateMat.push_back(ArrayBO::Zero((_layerConfig[i].Nr)));
+        stateMat.push_back(ArrayBO::Zero((layer.Nr)));
     }
 }
 
@@ -253,12 +236,10 @@ void EchoBay::Reservoir::init_WrLayers()
 {
     // Clear Wr vector
     WrLayers.clear();
-    // First layer
-    WrLayers.push_back(init_Wr(_layerConfig[0].Nr, _layerConfig[0].density, _layerConfig[0].desiredRho, _layerConfig[0].leaky, _layerConfig[0].edgesJumps));
-    for (int i = 1; i < _nLayers; ++i)
+    // Fill layers
+    for(const auto& layer: _layerConfig)
     {
-        // Subsequent layers
-        WrLayers.push_back(init_Wr(_layerConfig[i].Nr, _layerConfig[i].density, _layerConfig[i].desiredRho, _layerConfig[i].leaky, _layerConfig[i].edgesJumps));
+        WrLayers.push_back(init_Wr(layer.Nr, layer.density, layer.desiredRho, layer.leaky, layer.edgesJumps));
     }
 }
 
@@ -659,7 +640,7 @@ SparseBO EchoBay::Reservoir::init_Wr(const int Nr, const double density,
  * @param optParams Eigen Vector used by Limbo to define hyper-parameters
  * @param confParams YAML Node containing hyper-parameters at high level
  */
-void EchoBay::Reservoir::init_LayerConfig(const Eigen::VectorXd &optParams, YAML::Node confParams)
+void EchoBay::Reservoir::init_LayerConfig(const Eigen::VectorXd &optParams, const YAML::Node confParams)
 {
     // Reset layerConfig
     _layerConfig.clear();
@@ -816,7 +797,8 @@ ArrayI EchoBay::Reservoir::pick(int Nr, int k)
  * 
  * @return int internal Reservoir type
  */
-int EchoBay::Reservoir::get_ReservoirType(){
+int EchoBay::Reservoir::get_ReservoirType() const
+{
     return _type;
 }
 
@@ -825,7 +807,7 @@ int EchoBay::Reservoir::get_ReservoirType(){
  * 
  * @return std::vector<layerParameter> Layers configuration
  */
-std::vector<layerParameter> EchoBay::Reservoir::get_LayerConfig()
+std::vector<layerParameter> EchoBay::Reservoir::get_LayerConfig() const
 {
     return _layerConfig;
 }
@@ -835,9 +817,23 @@ std::vector<layerParameter> EchoBay::Reservoir::get_LayerConfig()
  * 
  * @return std::vector<int> Number of layers
  */
-int EchoBay::Reservoir::get_nLayers()
+int EchoBay::Reservoir::get_nLayers() const
 {
     return _nLayers;
+}
+
+/**
+ * @brief Return the sum of Nr across layers
+ * 
+ * @param layer number of layers. Default -1 counts all layers
+ * @return int sum of Nr across layers
+ */
+int EchoBay::Reservoir::get_fullNr(const int layer) const
+{
+    auto sumNr = [](int sum, const layerParameter& curr){return sum + curr.Nr;};
+    auto finalLayer = (layer == -1) ? _layerConfig.end() : _layerConfig.begin() + layer;
+
+    return 1 + std::accumulate(_layerConfig.begin(), finalLayer, 0, sumNr);
 }
 
 /**
@@ -845,7 +841,7 @@ int EchoBay::Reservoir::get_nLayers()
  * 
  * @return std::vector<std::vector<int>> Win Index
  */
-std::vector<ArrayI> EchoBay::Reservoir::get_WinIndex()
+std::vector<ArrayI> EchoBay::Reservoir::get_WinIndex() const
 {
     return _WinIndex;
 }
@@ -855,9 +851,23 @@ std::vector<ArrayI> EchoBay::Reservoir::get_WinIndex()
  * 
  * @return std::vector<std::vector<int>> Wout Index
  */
-std::vector<ArrayI> EchoBay::Reservoir::get_WoutIndex()
+std::vector<ArrayI> EchoBay::Reservoir::get_WoutIndex() const
 {
     return _WoutIndex;
+}
+
+/**
+ * @brief Return the sum of Nr across layers for SWT topology
+ * 
+ * @param layer number of layers. Default -1 counts all layers
+ * @return int sum of SWT Nr across layers
+ */
+int EchoBay::Reservoir::get_NrSWT(const int layer) const
+{
+    auto sumNrSWT = [](int sum, const ArrayI curr){return sum + curr.size();};
+    auto finalLayer = (layer == -1) ? _WoutIndex.end() : _WoutIndex.begin() + layer;
+
+    return 1 + std::accumulate(_WoutIndex.begin(), finalLayer, 0, sumNrSWT);
 }
 
 /**
@@ -866,7 +876,7 @@ std::vector<ArrayI> EchoBay::Reservoir::get_WoutIndex()
  * @params confParams YAML Node containing hyper-parameters at high level
  * @return floatBO The sum along all the layers of the product between Nr and Density 
  */
-floatBO EchoBay::Reservoir::return_net_dimension(YAML::Node confParams)
+floatBO EchoBay::Reservoir::return_net_dimension(const YAML::Node confParams) const
 {
     int optNr = 0,optDensity = 0;
     floatBO NrUpper, NrLower, densityUpper, densityLower;
