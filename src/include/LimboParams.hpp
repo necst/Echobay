@@ -6,12 +6,8 @@
 #include <limbo/serialize/text_archive.hpp>
 #include <limbo/init/random_sampling.hpp>
 
-#include "EigenConfig.hpp"
+#include "EchoBay.hpp"
 #include "DataStorage.hpp"
-
-// bad global variables
-MatrixBO samplingTrain, samplingVal, samplingTest;
-EchoBay::DataStorage series;
 
 typedef struct
 {

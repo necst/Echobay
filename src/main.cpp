@@ -1,6 +1,9 @@
 #include "esn.hpp"
 #include "IOUtils.hpp"
 #include "LimboParams.hpp"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #if defined(USE_PYBIND)
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
@@ -22,16 +25,24 @@ struct Eval
     BO_DYN_PARAM(int, dim_in);
     BO_DYN_PARAM(int, data_it);
 
+    // DataStorage parameters
+    BO_DYN_PARAM(MatrixBO, sampleTrain);
+    BO_DYN_PARAM(MatrixBO, sampleVal);
+    BO_DYN_PARAM(EchoBay::DataStorage, store);
+
     // Optimized function
     Eigen::VectorXd operator()(const Eigen::VectorXd &x) const
     {
         // Set sampling with respect to washout
         std::string problemType = configData["Problem_Definition"]["type"].as<std::string>();
+        MatrixBO samplingTrain = Eval::sampleTrain();
+        MatrixBO samplingVal = Eval::sampleVal();
+        DataStorage series = Eval::store(); // TODO check if it remains consistent
 
         int nWashout = parse_config<int>("washout_sample", -1, 0 , x, configData, 10);
-        series.set_sampleArray(samplingTrain, nWashout, true, problemType, "train");
+        series.set_sampleArray(samplingTrain, nWashout, true, problemType, EchoBay::Train);
         bool init_flag = samplingTrain(samplingTrain.rows()-1, 1) == 0;
-        series.set_sampleArray(samplingVal, nWashout, init_flag, problemType, "valid");
+        series.set_sampleArray(samplingVal, nWashout, init_flag, problemType, EchoBay::Valid);
         
         // Memory optimization penalty
         double penalty = 0;
@@ -54,6 +65,9 @@ struct Eval
 // Limbo dynamic parameters
 BO_DECLARE_DYN_PARAM(int, Eval, dim_in);
 BO_DECLARE_DYN_PARAM(int, Eval, data_it);
+BO_DECLARE_DYN_PARAM(MatrixBO, Eval, sampleTrain);
+BO_DECLARE_DYN_PARAM(MatrixBO, Eval, sampleVal);
+BO_DECLARE_DYN_PARAM(EchoBay::DataStorage, Eval, store);
 BO_DECLARE_DYN_PARAM(int, Params::init_randomsampling, samples);
 BO_DECLARE_DYN_PARAM(float, Params::stop_maxfitness, threshold);
 
@@ -102,6 +116,8 @@ int main(int argc, char **argv)
     MatrixBO trainData, trainLabel, evalData, evalLabel, testData;
     std::string trainLabelFile, evalLabelFile, testLabelFile;
     std::string samplingTrainFile, samplingValFile, samplingTestFile;
+    MatrixBO samplingTrain, samplingVal, samplingTest;
+    EchoBay::DataStorage series;
     Eigen::VectorXd bestSample;
     // Read configuration file
     std::string yamlFile;
@@ -157,6 +173,7 @@ int main(int argc, char **argv)
         ompThreads = configData["eigen_threads"].as<int>(); 
     }
     Eigen::setNbThreads(ompThreads);
+    omp_set_nested(1);
     std::cout << "Eigen using " << Eigen::nbThreads() << " threads" << std::endl;
 #endif
 
@@ -217,19 +234,19 @@ int main(int argc, char **argv)
         // Load training data from files
         trainDataFile = replace_tag(configData["train_data"].as<std::string>(), dataIter);
         trainLabelFile = replace_tag(configData["train_label"].as<std::string>(), dataIter);
-        series.load_data(trainDataFile, trainLabelFile, "train");
-        trainData = series.get_data("train", "data");
-        trainLabel = series.get_data("train", "label");
+        series.load_data(trainDataFile, trainLabelFile, EchoBay::Train);
+        trainData = series.get_data(EchoBay::Train, EchoBay::selData);
+        trainLabel = series.get_data(EchoBay::Train, EchoBay::selLabel);
 
         // Load validation data from files
         evalDataFile = replace_tag(configData["eval_data"].as<std::string>(), dataIter);
         evalLabelFile = replace_tag(configData["eval_label"].as<std::string>(), dataIter);
-        series.load_data(evalDataFile, evalLabelFile, "valid");
-        evalData = series.get_data("valid", "data");
-        evalLabel = series.get_data("valid", "label");
+        series.load_data(evalDataFile, evalLabelFile, EchoBay::Valid);
+        evalData = series.get_data(EchoBay::Valid, EchoBay::selData);
+        evalLabel = series.get_data(EchoBay::Valid, EchoBay::selLabel);
 
         // Check classes in validation for classification tasks
-        if((evalLabel.maxCoeff() > trainLabel.maxCoeff()) & problemType == "Classification")
+        if((evalLabel.maxCoeff() > trainLabel.maxCoeff()) & (problemType == "Classification"))
         {
             std::cout << "Error! Validation labels contain more classes than Training labels" << std::endl;
             return -1;
@@ -248,6 +265,9 @@ int main(int argc, char **argv)
             samplingTrain = MatrixBO::Constant(trainData.rows(), 2, 1);
             samplingVal = MatrixBO::Constant(evalData.rows(), 2, 1);
         }
+        Eval::set_sampleTrain(samplingTrain);
+        Eval::set_sampleVal(samplingVal);
+        Eval::set_store(series);
 
         // Control compute vs training
         using Kernel_t = kernel::MaternFiveHalves<Params>;
@@ -323,13 +343,13 @@ int main(int argc, char **argv)
         MatrixBO fullTrainSampling = cat_matrix(samplingTrain, samplingVal);
 
         // Copy it in data storage
-        series.copy_data(fullTrainData, fullTrainLabel, "train");
+        series.copy_data(fullTrainData, fullTrainLabel, EchoBay::Train);
 
         // Load test data from files
         testDataFile = replace_tag(configData["test_data"].as<std::string>(), dataIter);
         testLabelFile = replace_tag(configData["test_label"].as<std::string>(), dataIter);
-        series.load_data(testDataFile, testLabelFile, "test");
-        testData = series.get_data("test", "data");
+        series.load_data(testDataFile, testLabelFile, EchoBay::Test);
+        testData = series.get_data(EchoBay::Test, EchoBay::selData);
 
         // Load test sampling
         if (configData["test_sampling"])
@@ -344,9 +364,9 @@ int main(int argc, char **argv)
         
         // Set test sampling
         int nWashout = parse_config<int>("washout_sample", -1, 0, bestSample, configData, 10);
-        series.set_sampleArray(fullTrainSampling, nWashout, true, problemType, "train");
+        series.set_sampleArray(fullTrainSampling, nWashout, true, problemType, EchoBay::Train);
         bool init_flag = fullTrainSampling(fullTrainSampling.rows() - 1, 1) == 0;
-        series.set_sampleArray(samplingTest, nWashout, init_flag, problemType, "valid");
+        series.set_sampleArray(samplingTest, nWashout, init_flag, problemType, EchoBay::Valid);
 
         // Obtain fitness on test data
         ArrayBO fitness;
