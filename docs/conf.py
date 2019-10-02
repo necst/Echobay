@@ -59,3 +59,10 @@ html_static_path = ['_static']
 
 breathe_projects = { "EchoBay": "doxygen_doc/xml" }
 breathe_default_project = "EchoBay"
+
+# -- Configuration required for ReadTheDocs -----------------------------------
+
+import subprocess
+subprocess.call('cd .. ; doxygen', shell=True)
+
+html_extra_path = ['../build/html']
