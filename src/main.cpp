@@ -35,14 +35,15 @@ struct Eval
     {
         // Set sampling with respect to washout
         std::string problemType = configData["Problem_Definition"]["type"].as<std::string>();
+        std::string fitnessFunction = configData["Problem_Definition"]["Fitness_Function"].as<std::string>();
         MatrixBO samplingTrain = Eval::sampleTrain();
         MatrixBO samplingVal = Eval::sampleVal();
         DataStorage series = Eval::store(); // TODO check if it remains consistent
 
         int nWashout = parse_config<int>("washout_sample", -1, 0 , x, configData, 10);
-        series.set_sampleArray(samplingTrain, nWashout, true, problemType, EchoBay::Train);
+        series.set_sampleArray(samplingTrain, nWashout, true, problemType, fitnessFunction, EchoBay::Train);
         bool init_flag = samplingTrain(samplingTrain.rows()-1, 1) == 0;
-        series.set_sampleArray(samplingVal, nWashout, init_flag, problemType, EchoBay::Valid);
+        series.set_sampleArray(samplingVal, nWashout, init_flag, problemType, fitnessFunction, EchoBay::Valid);
         
         // Memory optimization penalty
         double penalty = 0;
@@ -220,6 +221,7 @@ int main(int argc, char **argv)
 
     // Set problem type
     std::string problemType = configData["Problem_Definition"]["type"].as<std::string>();
+    std::string fitnessFunction = configData["Problem_Definition"]["Fitness_Function"].as<std::string>();
 
     // Control execution
     for (int dataIter = 1; dataIter <= nDatasets; dataIter++)
@@ -234,14 +236,16 @@ int main(int argc, char **argv)
         // Load training data from files
         trainDataFile = replace_tag(configData["train_data"].as<std::string>(), dataIter);
         trainLabelFile = replace_tag(configData["train_label"].as<std::string>(), dataIter);
-        series.load_data(trainDataFile, trainLabelFile, EchoBay::Train);
+        series.load_data(trainDataFile, EchoBay::Train, EchoBay::selData);
+        series.load_data(trainLabelFile, EchoBay::Train, EchoBay::selLabel);
         trainData = series.get_data(EchoBay::Train, EchoBay::selData);
         trainLabel = series.get_data(EchoBay::Train, EchoBay::selLabel);
 
         // Load validation data from files
         evalDataFile = replace_tag(configData["eval_data"].as<std::string>(), dataIter);
         evalLabelFile = replace_tag(configData["eval_label"].as<std::string>(), dataIter);
-        series.load_data(evalDataFile, evalLabelFile, EchoBay::Valid);
+        series.load_data(evalDataFile, EchoBay::Valid, EchoBay::selData);
+        series.load_data(evalLabelFile, EchoBay::Valid, EchoBay::selLabel);
         evalData = series.get_data(EchoBay::Valid, EchoBay::selData);
         evalLabel = series.get_data(EchoBay::Valid, EchoBay::selLabel);
 
@@ -348,7 +352,7 @@ int main(int argc, char **argv)
         // Load test data from files
         testDataFile = replace_tag(configData["test_data"].as<std::string>(), dataIter);
         testLabelFile = replace_tag(configData["test_label"].as<std::string>(), dataIter);
-        series.load_data(testDataFile, testLabelFile, EchoBay::Test);
+        series.load_data(testDataFile, EchoBay::Test, EchoBay::selData);
         testData = series.get_data(EchoBay::Test, EchoBay::selData);
 
         // Load test sampling
@@ -364,9 +368,9 @@ int main(int argc, char **argv)
         
         // Set test sampling
         int nWashout = parse_config<int>("washout_sample", -1, 0, bestSample, configData, 10);
-        series.set_sampleArray(fullTrainSampling, nWashout, true, problemType, EchoBay::Train);
+        series.set_sampleArray(fullTrainSampling, nWashout, true, problemType, fitnessFunction, EchoBay::Train);
         bool init_flag = fullTrainSampling(fullTrainSampling.rows() - 1, 1) == 0;
-        series.set_sampleArray(samplingTest, nWashout, init_flag, problemType, EchoBay::Valid);
+        series.set_sampleArray(samplingTest, nWashout, init_flag, problemType, fitnessFunction, EchoBay::Valid);
 
         // Obtain fitness on test data
         ArrayBO fitness;

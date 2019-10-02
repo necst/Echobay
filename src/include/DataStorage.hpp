@@ -19,9 +19,9 @@ namespace EchoBay
     {
         public:
         DataStorage() {};
-        void load_data(const std::string dataFile, const std::string labelFile, const uint8_t type);
+        void load_data(const std::string dataFile, const uint8_t type, const uint8_t select);
         void copy_data(Eigen::Ref<MatrixBO> data, Eigen::Ref<MatrixBO> label, const uint8_t type);
-        ArrayI8 set_sampleArray(Eigen::Ref<MatrixBO> samplingData, int nWashout, bool init_flag, const std::string &problemType, const uint8_t type);
+        ArrayI8 set_sampleArray(Eigen::Ref<MatrixBO> samplingData, int nWashout, bool init_flag, const std::string &problemType, const std::string &fitnessFunction, const uint8_t type);
         MatrixBO get_data(const uint8_t type, const uint8_t select) const;
         int get_dataCols(const uint8_t type) const;
         int get_dataLength(const uint8_t type) const;
@@ -32,6 +32,7 @@ namespace EchoBay
 
         private:
         int get_nBatches(Eigen::Ref<MatrixBO> samplingData);
+        ArrayI8 init_array(const int size, const std::string &problemType, const std::string &fitnessFunction);
         std::array<std::vector<ArrayI8>, 2> _samplingBatches;
         std::array<MatrixBO, 2> _seriesData;
         std::array<MatrixBO, 2> _seriesLabel;

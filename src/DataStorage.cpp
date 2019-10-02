@@ -9,11 +9,17 @@ using namespace Eigen;
  * @param labelFile path to the label file
  * @param type differentiate training data ("train") or validation/test ("valid")
  */
-void EchoBay::DataStorage::load_data(const std::string dataFile, const std::string labelFile, const uint8_t type)
+void EchoBay::DataStorage::load_data(const std::string dataFile, const uint8_t type, const uint8_t select)
 {
     uint8_t _type = (type == EchoBay::Train) ? 0 : 1; // Avoid bad calls
-    load_csv(dataFile, _seriesData[_type]);
-    load_csv(labelFile, _seriesLabel[_type]);
+    if (select == EchoBay::selData)
+    {
+        load_csv(dataFile, _seriesData[_type]);
+    }
+    else
+    {
+        load_csv(dataFile, _seriesLabel[_type]);
+    }
 }
 
 /**
@@ -128,18 +134,42 @@ int EchoBay::DataStorage::get_nBatches(Eigen::Ref<MatrixBO> samplingData)
 }
 
 /**
+ * @brief Initialize sampling vector according to problem
+ * 
+ * @param size Size of the desired array
+ * @param problemType Classification or Regression/Memory or unsupervised
+ * @param fitnessFunction fitness function necessary for unsupervised init
+ * @return ArrayI8 initialized array
+ */
+ArrayI8 EchoBay::DataStorage::init_array(const int size, const std::string &problemType, const std::string &fitnessFunction)
+{
+    if (problemType == "Classification")
+    {
+        return ArrayI8::Constant(size, 0);
+    }
+    else if (problemType == "Regression" || problemType == "MemoryCapacity")
+    {
+        return ArrayI8::Constant(size, 1);
+    }
+    else // Unsupervised
+    {
+        return fitnessFunction == "KMeans" ? ArrayI8::Constant(size, 0) : ArrayI8::Constant(size, 1);
+    }
+}
+
+/**
  * @brief Normalize sampling vector to be used in other functions
  * 
  * @param samplingData Eigen Matrix with sampling format TODO explain this
  * @param nWashout Number of washout samples
  * @param init_flag Flag that controls if washout resets also ESN states
- * @param problemType Classification or Regression/Memory
+ * @param problemType Classification or Regression/Memory or unsupervised
+ * @param fitnessFunction fitness function necessary for unsupervised init
  * @param type train or validation
  * @return ArrayBO Cleaned sampling array
  */
-ArrayI8 EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData, int nWashout, bool init_flag, const std::string &problemType, const uint8_t type)
+ArrayI8 EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData, int nWashout, bool init_flag, const std::string &problemType, const std::string &fitnessFunction, const uint8_t type)
 {
-    int nSamples = _seriesData[type].rows(); //(type == EchoBay::Train) ? _trainData.rows() : _evalData.rows();
     int nBatches = get_nBatches(samplingData);
     // Generate sampling vectors
     ArrayI resetSamples(samplingData.rows());
@@ -154,11 +184,11 @@ ArrayI8 EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData,
     ArrayI8 samplingPoints;
 
     // Get cumulative sum and differences
-    auto sumIntCast = [](floatBO x, floatBO y){return (int)(x+y);};
+    auto sumIntCast = [](floatBO x, floatBO y) { return (int)(x + y); };
     std::partial_sum(samplingData.col(0).data(), samplingData.col(0).data() + samplingData.col(0).size(), resetSamples.data(), sumIntCast);
 
     // Place 1 to sample data
-    samplingPoints = (problemType == "Classification") ? ArrayI8::Constant(resetSamples.tail(1)[0], 0) : ArrayI8::Constant(resetSamples.tail(1)[0], 1);
+    samplingPoints = init_array(resetSamples.tail(1)[0], problemType, fitnessFunction);
     // TODO Check washout size
     // if(nWashout >= SamplingTrain.col(0).minCoeff() || nWashout >= SamplingVal.col(0).minCoeff())
     // {
@@ -167,7 +197,13 @@ ArrayI8 EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData,
     // }
     if (nBatches == 1)
     {
-        ArrayI8 support = (problemType == "Classification") ? ArrayI8::Constant(nSamples, 0) : ArrayI8::Constant(nSamples, 1);
+        int nSamples = _seriesData[type].rows();
+        ArrayI8 support = init_array(nSamples, problemType, fitnessFunction);
+        // Add washout
+        if (nWashout > 0 && init_flag)
+        {
+            support.head(nWashout) << ArrayI8::Zero(nWashout);
+        }
         // Push to sampler
         _samplingBatches[arrIdx].push_back(support);
         _dataOffset[arrIdx].push_back(0);
@@ -180,7 +216,7 @@ ArrayI8 EchoBay::DataStorage::set_sampleArray(Eigen::Ref<MatrixBO> samplingData,
         {
             if ((samplingData(s, 1) == 0) | (s == resetSamples.rows() - 1))
             {
-                ArrayI8 support = (problemType == "Classification") ? ArrayI8::Constant(resetSamples[s] - lastReset, 0) : ArrayI8::Constant(resetSamples[s] - lastReset, 1);
+                ArrayI8 support = init_array(resetSamples[s] - lastReset, problemType, fitnessFunction);
                 // Annotate last reset
                 lastReset = resetSamples[s];
                 // Add washout
