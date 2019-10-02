@@ -1,5 +1,5 @@
 # EchoBay
-EchoBay is a C++, [Eigen](http://eigen.tuxfamily.org) powered library, for the training and deployment of Echo State Networks, with multiple layers and different topologies.
+**EchoBay** is a C++, [Eigen](http://eigen.tuxfamily.org) powered library, for the training and deployment of Echo State Networks, with multiple layers and different topologies.
 EchoBay employs Limbo library to find the best set of hyper-parameters that maximize a score function.
 EchoBay is designed to work almost seamlessly on small computers, microcontrollers (tested on ESP32) and large multi-threaded systems.
 
@@ -8,7 +8,9 @@ EchoBay is designed to work almost seamlessly on small computers, microcontrolle
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) tested on v0.6.2
 - [spectra](https://spectralib.org/) tested on v0.7.0
 
-Optional dependencies to read CSV data [fast-cpp-csv-parser](https://github.com/ben-strasser/fast-cpp-csv-parser)
+Optional dependencies to read CSV data [fast-cpp-csv-parser](https://github.com/ben-strasser/fast-cpp-csv-parser).
+
+**Full documentation** is available [here](https://echobay.readthedocs.io/en/latest/).
 
 ## Basic Usage
 After configuration and building (see docs for details) the basic usage is:
