@@ -63,6 +63,6 @@ breathe_default_project = "EchoBay"
 # -- Configuration required for ReadTheDocs -----------------------------------
 
 import subprocess
-subprocess.call('cd .. ; doxygen', shell=True)
+subprocess.call('doxygen', shell=True)
 
 html_extra_path = ['../build/html']
