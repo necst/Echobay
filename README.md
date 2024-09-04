@@ -3,12 +3,16 @@
 EchoBay employs Limbo library to find the best set of hyper-parameters that maximize a score function.
 EchoBay is designed to work almost seamlessly on small computers, microcontrollers (tested on ESP32) and large multi-threaded systems.
 
+**NOTE** This repo is read-only now for reference purposes of manuscript https://doi.org/10.1145/3404993. Current active development and updated dependencies are available at: https://github.com/LucaCerina/Echobay
+
 ## Prerequisites
 - [Limbo](http://www.resibots.eu/limbo/) tested on v2.1.0
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp) tested on v0.6.2
 - [spectra](https://spectralib.org/) tested on v0.7.0
 
 Optional dependencies to read CSV data [fast-cpp-csv-parser](https://github.com/ben-strasser/fast-cpp-csv-parser).
+
+**NOTE** This repo is read-only and prerequisites may not be updated. Current active development and updated dependencies are available at: https://github.com/LucaCerina/Echobay
 
 **Full documentation** is available [here](https://echobay.readthedocs.io/en/latest/).
 
@@ -33,4 +37,7 @@ Other important contributions in this research are from Claudio Gallicchio and A
 ### Citing EchoBay
 If you use EchoBay in a scientific paper, please cite:
 
-Cerina, Luca, Giuseppe Franco, and Marco D. Santambrogio. (2019) [Lightweight autonomous bayesian optimization of Echo-State Networks.](https://www.elen.ucl.ac.be/Proceedings/esann/esannpdf/es2019-103.pdf), European Symposium on Artificial Neural Networks, ESANN, 2019.
+L. Cerina,  G. Franco, C. Gallicchio, and A. Micheli, and M. D. Santambrogio. 2020. EchoBay: Design and Optimization of Echo State Networks under Memory and Time Constraints. ACM Trans. Archit. Code Optim. 17, 3, Article 22 (September 2020), 24 pages. https://doi.org/10.1145/3404993
+
+      
+
